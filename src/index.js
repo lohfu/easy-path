@@ -1,80 +1,22 @@
-import { h, Component } from 'preact';
-import { exec, pathRankSort } from './util';
+import { getCurrentUrl, match, parseRoutes, pathRankSort } from './util';
+import * as qs from './queryString';
 
-let customHistory = null;
 
-const ROUTERS = [];
+let remember = null;
+let handler = null;
+let finish = null;
+let root = null;
+let routes = [];
+let running = false;
+let previousUrl = null;
+let currentUrl = null;
+let currentRoute = null;
+
+const defaultOptions = {
+  routes: [],
+}
 
 const EMPTY = {};
-
-// hangs off all elements created by preact
-const ATTR_KEY = typeof Symbol!=='undefined' ? Symbol.for('preactattr') : '__preactattr_';
-
-
-function isPreactElement(node) {
-	return ATTR_KEY in node;
-}
-
-function setUrl(url, type='push') {
-	if (customHistory && customHistory[type]) {
-		customHistory[type](url);
-	}
-	else if (typeof history!=='undefined' && history[type+'State']) {
-		history[type+'State'](null, null, url);
-	}
-}
-
-
-function getCurrentUrl() {
-	let url;
-	if (customHistory && customHistory.location) {
-		url = customHistory.location;
-	}
-	else if (customHistory && customHistory.getCurrentLocation) {
-		url = customHistory.getCurrentLocation();
-	}
-	else {
-		url = typeof location!=='undefined' ? location : EMPTY;
-	}
-	return `${url.pathname || ''}${url.search || ''}`;
-}
-
-
-function route(url, replace=false) {
-	if (typeof url!=='string' && url.url) {
-		replace = url.replace;
-		url = url.url;
-	}
-
-	// only push URL into history if we can handle it
-	if (canRoute(url)) {
-		setUrl(url, replace ? 'replace' : 'push');
-	}
-
-	return routeTo(url);
-}
-
-
-/** Check if the given URL can be handled by any router instances. */
-function canRoute(url) {
-	for (let i=ROUTERS.length; i--; ) {
-		if (ROUTERS[i].canRoute(url)) return true;
-	}
-	return false;
-}
-
-
-/** Tell all router instances to handle the given URL.  */
-function routeTo(url) {
-	let didRoute = false;
-	for (let i=0; i<ROUTERS.length; i++) {
-		if (ROUTERS[i].routeTo(url)===true) {
-			didRoute = true;
-		}
-	}
-	return didRoute;
-}
-
 
 function routeFromLink(node) {
 	// only valid elements
@@ -87,16 +29,10 @@ function routeFromLink(node) {
 	if (!href || !href.match(/^\//g) || (target && !target.match(/^_?self$/i))) return;
 
 	// attempt to route, if no match simply cede control to browser
-	return route(href);
+	goTo({ url: href }, true);
+
+  return true;
 }
-
-
-function handleLinkClick(e) {
-	if (e.button !== 0) return;
-	routeFromLink(e.currentTarget || e.target || this);
-	return prevent(e);
-}
-
 
 function prevent(e) {
 	if (e) {
@@ -107,144 +43,142 @@ function prevent(e) {
 	return false;
 }
 
-
-function delegateLinkHandler(e) {
+export function delegateLinkHandler(e) {
 	// ignore events the browser takes care of already:
 	if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
 
 	let t = e.target;
 	do {
-		if (String(t.nodeName).toUpperCase()==='A' && t.getAttribute('href') && isPreactElement(t)) {
+		if (String(t.nodeName).toUpperCase()==='A' && t.getAttribute('href')) {
 			if (e.button !== 0) return;
+
 			// if link is handled by the router, prevent browser defaults
-			if (routeFromLink(t)) {
-				return prevent(e);
-			}
+      if (routeFromLink(t)) {
+        return prevent(e);
+      }
 		}
 	} while ((t=t.parentNode));
 }
 
-
-if (typeof addEventListener==='function') {
-	addEventListener('popstate', () => routeTo(getCurrentUrl()));
-	addEventListener('click', delegateLinkHandler);
-}
-
-
-const Link = (props) => {
-	return h('a', Object.assign({}, props, { onClick: handleLinkClick }));
-};
-
-
-class Router extends Component {
-	constructor(props) {
-		super(props);
-		if (props.history) {
-			customHistory = props.history;
-		}
-
-		this.state = {
-			url: this.props.url || getCurrentUrl()
-		};
-	}
-
-	shouldComponentUpdate(props) {
-		if (props.static!==true) return true;
-		return props.url!==this.props.url || props.onChange!==this.props.onChange;
-	}
-
-	/** Check if the given URL can be matched against any children */
-	canRoute(url) {
-		return this.getMatchingChildren(this.props.children, url, false).length > 0;
-	}
-
-	/** Re-render children with a new URL to match against. */
-	routeTo(url) {
-		this._didRoute = false;
-		this.setState({ url });
-
-		// if we're in the middle of an update, don't synchronously re-route.
-		if (this.updating) return this.canRoute(url);
-
-		this.forceUpdate();
-		return this._didRoute;
-	}
-
-	componentWillMount() {
-		ROUTERS.push(this);
-		this.updating = true;
-	}
-
-	componentDidMount() {
-		this.updating = false;
-	}
-
-	componentWillUnmount() {
-		ROUTERS.splice(ROUTERS.indexOf(this), 1);
-	}
-
-	componentWillUpdate() {
-		this.updating = true;
-	}
-
-	componentDidUpdate() {
-		this.updating = false;
-	}
-
-	getMatchingChildren(children, url, invoke) {
-		return children.slice().sort(pathRankSort).filter( ({ attributes }) => {
-			let path = attributes.path,
-				matches = exec(url, path, attributes);
-			if (matches) {
-				if (invoke!==false) {
-					attributes.url = url;
-					attributes.matches = matches;
-					// copy matches onto props
-					for (let i in matches) {
-						if (matches.hasOwnProperty(i)) {
-							attributes[i] = matches[i];
-						}
-					}
-				}
-				return true;
-			}
-		});
-	}
-
-	render({ children, onChange }, { url }) {
-		let active = this.getMatchingChildren(children, url, true);
-
-		let current = active[0] || null;
-		this._didRoute = !!current;
-
-		let previous = this.previousUrl;
-		if (url!==previous) {
-			this.previousUrl = url;
-			if (typeof onChange==='function') {
-				onChange({
-					router: this,
-					url,
-					previous,
-					active,
-					current
-				});
-			}
-		}
-
-		return current;
+export function setUrl(url, state = null, type='push') {
+	if (typeof history!=='undefined' && history[type+'State']) {
+		history[type+'State'](state, null, url);
 	}
 }
 
+export function goTo({ query, path, pathname, url, search }, handle, replace) {
+  path = path || pathname;
 
-const Route = ({ component, url, matches }) => {
-	return h(component, { url, matches });
-};
+  if (query) {
+    if (query !== 'string') {
+      query = qs.stringify(query);
+    }
 
+    path = path || window.location.pathname;
+    search = search || query ? `?${query}` : '';
+  } else if (path) {
+    search = search || window.location.search;
+  }
 
-Router.route = route;
-Router.Router = Router;
-Router.Route = Route;
-Router.Link = Link;
+  url = url || `${path}${search}`;
 
-export { route, Router, Route, Link };
-export default Router;
+  if (!replace && remember) {
+    const data = remember();
+    
+    if (data && Object.keys(data).length) setUrl(getCurrentUrl(), Object.assign({}, window.history.state, data), 'replace');
+  }
+
+  setUrl(url, null, replace ? 'replace' : 'push');
+
+  exec(url, handle);
+}
+
+/** Check if the given URL can be matched against any routes */
+export function canRoute(url) {
+  const path = url.split('?')[0];
+
+  return running && this.routes.some((route) => match(url, route.path));
+}
+
+/** Re-render children with a new URL to match against. */
+export function exec(url, handle = false, reload = false) {
+  if (!reload && currentRoute && currentRoute.url === url) return;
+
+  previousUrl = currentRoute && currentRoute.url;
+  currentUrl = url;
+
+  currentRoute = Object.assign({}, getMatchingRoute(url), {
+    url: url,
+    query: qs.parse(window.location.search.slice(1)),
+    state: history.state,
+  });
+
+  const ctx = {
+    route: currentRoute,
+    state: history.state,
+  };
+
+  // const handler = route.handler || (route.noHandler ? null : this.handler);
+  const h = handle && (currentRoute.handler || handler);
+
+  if (h) {
+    h(ctx, () => {
+      if (finish) finish(ctx);
+    });
+  } else if (finish) {
+    finish(ctx);
+  }
+}
+
+export function getCurrentRoute() {
+  return currentRoute;
+}
+
+export function getMatchingRoute(url, invoke) {
+  // TODO make this smarter, eg check if the url begings with root
+  if (root) url = url.slice(root.length);
+
+  for (const key in routes) {
+    const route = routes[key];
+
+    const params = match(url, route.path);
+
+    if (params) {
+      return Object.assign({ url, params }, route);
+    }
+  }
+}
+
+export function start(options = {}) {
+  remember = options.remember;
+  handler = options.handler;
+  finish = options.finish;
+  root = options.root;
+
+  if (!options.routes || Array.isArray(options.routes)) {
+    routes = options.routes;
+  } else {
+    // TODO throw error if non compatible routes object
+    routes = parseRoutes(options.routes);
+  }
+
+  if (typeof addEventListener==='function') {
+    if (options.popstate) {
+      addEventListener('popstate', options.popstate);
+    } else if (options.popstate !== false) {
+      addEventListener('popstate', (e) => {
+        exec(getCurrentUrl(), true);
+      });
+    }
+
+    addEventListener('click', delegateLinkHandler);
+  }
+
+  // default handler (optional)
+
+  if (options.exec)
+    exec(options.url || getCurrentUrl(), options.handle);
+}
+
+export function stop() {
+}

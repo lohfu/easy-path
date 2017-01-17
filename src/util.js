@@ -1,7 +1,8 @@
+import { omit, reduce } from 'lowline';
 
 const EMPTY = {};
 
-export function exec(url, route, opts=EMPTY) {
+export function match(url, route, opts=EMPTY) {
 	let reg = /(?:\?([^#]*))?(#.*)?$/,
 		c = url.match(reg),
 		matches = {},
@@ -42,13 +43,39 @@ export function exec(url, route, opts=EMPTY) {
 	return matches;
 }
 
+export function parseRoutes(routes, tree = []) {
+  return reduce(routes, (result, value, key) => {
+    const path = tree.concat(key.slice(1).split('/').filter((value) => !!value));
+
+    const obj = Object.assign({
+      path: `/${path.join('/')}`,
+    }, omit(value, 'routes'));
+
+    result.push(obj);
+
+    if (value.routes) {
+      result.push(...parseRoutes(value.routes, path));
+    }
+
+    return result;
+  }, []).sort(pathRankSort);
+}
+
+export function getCurrentUrl() {
+	const url = typeof location!=='undefined' ? location : EMPTY;
+
+	return `${url.pathname || ''}${url.search || ''}`;
+}
+
 export function pathRankSort(a, b) {
-	let aAttr = a.attributes || EMPTY,
-		bAttr = b.attributes || EMPTY;
-	if (aAttr.default) return 1;
-	if (bAttr.default) return -1;
-	let diff = rank(aAttr.path) - rank(bAttr.path);
-	return diff || (aAttr.path.length - bAttr.path.length);
+  a = a.path;
+  b = b.path;
+	// let aAttr = a.attributes || EMPTY,
+	// 	bAttr = b.attributes || EMPTY;
+	// if (aAttr.default) return 1;
+	// if (bAttr.default) return -1;
+	let diff = rank(a) - rank(b);
+	return diff || (a.length - b.length);
 }
 
 export function segmentize(url) {
