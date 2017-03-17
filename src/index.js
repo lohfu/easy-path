@@ -1,23 +1,14 @@
+import { pick, omit } from 'lowline';
+import * as qs from 'mini-qs';
 import { getCurrentUrl, match, parseRoutes, pathRankSort } from './util';
-import * as qs from './queryString';
 
-
-let remember = null;
-let handler = null;
-let finish = null;
-let root = null;
-let routes = [];
-let running = false;
-let previousUrl = null;
-let currentUrl = null;
-let currentRoute = null;
-
-const defaultOptions = {
-  routes: [],
-}
-
+const ROUTERS = [];
 const EMPTY = {};
 
+/*
+ * @return Result of goTo, which is a promise if at least on router
+ * can executed, undefined otherwise
+ */
 function routeFromLink(node) {
 	// only valid elements
 	if (!node || !node.getAttribute) return;
@@ -26,12 +17,9 @@ function routeFromLink(node) {
 		target = node.getAttribute('target');
 
 	// ignore links with targets and non-path URLs
-	if (!href || !href.match(/^\//g) || (target && !target.match(/^_?self$/i))) return;
+	if (!href || !href.match(/^\//g) || target) return;
 
-	// attempt to route, if no match simply cede control to browser
-	goTo({ url: href }, true);
-
-  return true;
+  return goTo({ url: href, run: true });
 }
 
 function prevent(e) {
@@ -43,11 +31,12 @@ function prevent(e) {
 	return false;
 }
 
-export function delegateLinkHandler(e) {
+function delegateLinkHandler(e) {
 	// ignore events the browser takes care of already:
 	if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
 
 	let t = e.target;
+
 	do {
 		if (String(t.nodeName).toUpperCase()==='A' && t.getAttribute('href')) {
 			if (e.button !== 0) return;
@@ -60,125 +49,175 @@ export function delegateLinkHandler(e) {
 	} while ((t=t.parentNode));
 }
 
-export function setUrl(url, state = null, type='push') {
+function setUrl(url, state = null, type='push') {
 	if (typeof history!=='undefined' && history[type+'State']) {
 		history[type+'State'](state, null, url);
 	}
 }
 
-export function goTo({ query, path, pathname, url, search }, handle, replace) {
-  path = path || pathname;
+/*
+ * Use setUrl to store data to history.state
+ */
+export function store(data) {
+  setUrl(getCurrentUrl(), Object.assign({}, window.history.state, data), 'replace');
+}
 
-  if (query) {
-    if (query !== 'string') {
-      query = qs.stringify(query);
+/*
+ * precedence
+ *
+ * 1. url
+ * 2. path
+ * 3. (pathname || window.location.pathname) + search
+ * 4. (pathname || window.location.pathname) + '?' + query
+ *
+ * ie you cannot only pass `pathname`, you have to pass `search` and `query`.
+ * if you want to go to a `pathname` without a `search` or `query` pass `path` instead
+ */
+export function goTo({ query, href, path, pathname, url, search, run = true, replace }) {
+  url = url || href;
+
+  if (!url) {
+    if (!path) {
+      pathname = pathname || window.location.pathname;
+
+      if (!search) {
+        if (!query) {
+          return console.error('You have to pass at least one of the following: url, path, search or query');
+        } else if (query !== 'string') {
+          query = qs.stringify(query);
+        }
+
+        search = query ? '?' + query : '';
+      }
+
+      url = pathname + search;
+    } else {
+      url = path;
     }
-
-    path = path || window.location.pathname;
-    search = search || query ? `?${query}` : '';
-  } else if (path) {
-    search = search || window.location.search;
   }
 
-  url = url || `${path}${search}`;
+  const routers = ROUTERS.filter((router) => {
+    if (router.canRoute(url)) {
+      if (!replace && router.remember) store(router.remember());
 
-  if (!replace && remember) {
-    const data = remember();
-    
-    if (data && Object.keys(data).length) setUrl(getCurrentUrl(), Object.assign({}, window.history.state, data), 'replace');
-  }
-
-  setUrl(url, null, replace ? 'replace' : 'push');
-
-  exec(url, handle);
-}
-
-/** Check if the given URL can be matched against any routes */
-export function canRoute(url) {
-  const path = url.split('?')[0];
-
-  return running && this.routes.some((route) => match(url, route.path));
-}
-
-/** Re-render children with a new URL to match against. */
-export function exec(url, handle = false, reload = false) {
-  if (!reload && currentRoute && currentRoute.url === url) return;
-
-  previousUrl = currentRoute && currentRoute.url;
-  currentUrl = url;
-
-  currentRoute = Object.assign({}, getMatchingRoute(url), {
-    url: url,
-    query: qs.parse(window.location.search.slice(1)),
-    state: history.state,
+      return true;
+    }
   });
 
-  const ctx = {
-    route: currentRoute,
-    state: history.state,
-  };
+  if (routers.length) {
+    setUrl(url, null, replace ? 'replace' : 'push');
 
-  // const handler = route.handler || (route.noHandler ? null : this.handler);
-  const h = handle && (currentRoute.handler || handler);
+    if (routers.length === 1) return routers[0].exec(url, run);
 
-  if (h) {
-    h(ctx, () => {
-      if (finish) finish(ctx);
+    return Promise.all(routers.map((router) => router.exec(url, run)));
+  }
+}
+
+
+export class Router {
+  constructor(options) {
+    if (options.scrollRestoration && window.history.scrollRestoration) window.history.scrollRestoration = options.scrollRestoration;
+
+    Object.assign(this, pick(options, 'finish', 'remember', 'pre', 'post', 'root'));
+
+    if (this.root && !this.root.startsWith('/')) this.root = '/' + this.root;
+
+    if (!options.routes) {
+      throw new Error('No routes provided');
+    } else if (Array.isArray(options.routes)) {
+      this.routes = options.routes;
+    } else {
+      // TODO throw error if non compatible routes object
+      this.routes = parseRoutes(options.routes, this.root ? this.root.split('/').slice(1) : []).sort(pathRankSort);
+    }
+
+    if (typeof addEventListener==='function') {
+      if (options.popstate) {
+        addEventListener('popstate', options.popstate);
+      } else if (options.popstate !== false) {
+        addEventListener('popstate', (e) => {
+          this.exec(getCurrentUrl(), true);
+        });
+      }
+
+      addEventListener('click', delegateLinkHandler);
+    }
+
+    ROUTERS.push(this);
+  }
+
+  exec(url, run = false, reload = false) {
+    if (!this._listening || (!reload && this.current && this.current.url === url)) return;
+
+    const { params, route } = this.getMatchingRoute(url);
+
+    if (!route) return;
+
+    const ctx = this.current = Object.assign({ url, state: window.history.state, params }, route);
+
+    let mw = [];
+
+    if (run) {
+      if (this.pre) mw = mw.concat(this.pre);
+      if (route.mw) mw = mw.concat(route.mw);
+      if (this.post) mw = mw.concat(this.post);
+    }
+
+    if (route.finish || this.finish) mw = mw.concat(route.finish || this.finish);
+
+    return new Promise((resolve, reject) => {
+      function next(err) {
+        if (err) return reject(err);
+
+        if (mw.length) return mw.shift()(ctx, next);
+
+        resolve(ctx);
+      }
+
+      next();
     });
-  } else if (finish) {
-    finish(ctx);
   }
-}
 
-export function getCurrentRoute() {
-  return currentRoute;
-}
+  /** Check if the given URL can be matched against any routes */
+  canRoute(url) {
+    return this._listening && this.routes.some((route) => match(url, route.path));
+  }
 
-export function getMatchingRoute(url, invoke) {
-  // TODO make this smarter, eg check if the url begings with root
-  if (root) url = url.slice(root.length);
+  /** Re-render children with a new URL to match against. */
+  getCurrentRoute() {
+    return this.current;
+  }
 
-  for (const key in routes) {
-    const route = routes[key];
+  getMatchingRoute(url, invoke) {
+    // TODO make this smarter, eg check if the url begings with root
+    if (this.root) url = url.slice(root.length);
 
-    const params = match(url, route.path);
+    for (let i = 0; i < this.routes.length; i++) {
+      const route = this.routes[i];
 
-    if (params) {
-      return Object.assign({ url, params }, route);
+      const params = match(url, route.path);
+
+      if (params) {
+        return Object.assign({ params, route });
+      }
     }
   }
-}
 
-export function start(options = {}) {
-  remember = options.remember;
-  handler = options.handler;
-  finish = options.finish;
-  root = options.root;
+  start(options = {}) {
+    this._listening = true;
 
-  if (!options.routes || Array.isArray(options.routes)) {
-    routes = options.routes;
-  } else {
-    // TODO throw error if non compatible routes object
-    routes = parseRoutes(options.routes);
-  }
+    if (options.trigger) {
+      if (this.remember) {
+        store(this.remember());
+      }
 
-  if (typeof addEventListener==='function') {
-    if (options.popstate) {
-      addEventListener('popstate', options.popstate);
-    } else if (options.popstate !== false) {
-      addEventListener('popstate', (e) => {
-        exec(getCurrentUrl(), true);
-      });
+      return this.exec(options.url || getCurrentUrl(), options.run);
     }
 
-    addEventListener('click', delegateLinkHandler);
+    return Promise.resolve();
   }
 
-  // default handler (optional)
-
-  if (options.exec)
-    exec(options.url || getCurrentUrl(), options.handle);
-}
-
-export function stop() {
+  stop() {
+    this._listening = false;
+  }
 }

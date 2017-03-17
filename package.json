@@ -2,7 +2,17 @@
   "name": "easy-path",
   "version": "0.0.1",
   "description": "General purpose front end URL router",
-  "main": "src/index.js",
+  "main": "node/index.js",
+  "jsnext:main": "src/index.js",
+  "scripts": {
+    "clean": "rimraf node",
+    "lint": "eslint src",
+    "build": "npm run build:cjs",
+    "build:cjs": "BABEL_ENV=node babel src --out-dir node",
+    "test": "BABEL_ENV=node node tests/index.js | tap-spec",
+    "prepublish": "npm run lint && npm run clean && npm run build",
+    "preversion": "npm run lint"
+  },
   "keywords": [
     "router"
   ],
@@ -20,6 +30,20 @@
   },
   "homepage": "https://github.com/lohfu/easy-path",
   "dependencies": {
-    "lowline": "^0.1.1"
+    "lodash": "^4.17.4",
+    "lowline": "^0.1.3",
+    "mini-qs": "0.0.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.24.0",
+    "babel-plugin-add-module-exports": "^0.2.1",
+    "babel-preset-es2015": "^6.24.0",
+    "babel-preset-es2015-node6": "^0.4.0",
+    "babel-register": "^6.24.0",
+    "eslint": "^3.18.0",
+    "eslint-config-airbnb-base": "^11.1.1",
+    "eslint-plugin-import": "^2.2.0",
+    "tap-spec": "^4.1.1",
+    "tape": "^4.6.3"
   }
 }

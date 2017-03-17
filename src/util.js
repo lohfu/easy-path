@@ -51,6 +51,9 @@ export function parseRoutes(routes, tree = []) {
       path: `/${path.join('/')}`,
     }, omit(value, 'routes'));
 
+    if (obj.middleware) obj.mw = obj.middleware;
+    else if (obj.mw) obj.middleware = obj.mw;
+
     result.push(obj);
 
     if (value.routes) {
@@ -58,7 +61,7 @@ export function parseRoutes(routes, tree = []) {
     }
 
     return result;
-  }, []).sort(pathRankSort);
+  }, []);
 }
 
 export function getCurrentUrl() {
