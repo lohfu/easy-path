@@ -149,9 +149,11 @@ export class Router {
   exec(url, run = false, reload = false) {
     if (!this._listening || (!reload && this.current && this.current.url === url)) return;
 
-    const { params, route } = this.getMatchingRoute(url);
+    const match = this.getMatchingRoute(url);
 
-    if (!route) return;
+    if (!match) return Promise.reject('No matching route');
+
+    const { params, route } = match;
 
     const ctx = this.current = Object.assign({ url, state: window.history.state, params }, route);
 
@@ -189,9 +191,6 @@ export class Router {
   }
 
   getMatchingRoute(url, invoke) {
-    // TODO make this smarter, eg check if the url begings with root
-    if (this.root) url = url.slice(root.length);
-
     for (let i = 0; i < this.routes.length; i++) {
       const route = this.routes[i];
 
