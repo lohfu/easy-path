@@ -1,58 +1,57 @@
-import { pick, omit } from 'lowline';
+import { pick } from 'lowline';
 import * as qs from 'mini-qs';
 import { getCurrentUrl, match, parseRoutes, pathRankSort } from './util';
 
 const ROUTERS = [];
-const EMPTY = {};
 
 /*
  * @return Result of goTo, which is a promise if at least on router
  * can executed, undefined otherwise
  */
 function routeFromLink(node) {
-	// only valid elements
-	if (!node || !node.getAttribute) return;
+  // only valid elements
+  if (!node || !node.getAttribute) return;
 
-	let href = node.getAttribute('href'),
-		target = node.getAttribute('target');
+  const href = node.getAttribute('href');
+  const target = node.getAttribute('target');
 
-	// ignore links with targets and non-path URLs
-	if (!href || !href.match(/^\//g) || target) return;
+  // ignore links with targets and non-path URLs
+  if (!href || !href.match(/^\//g) || target) return;
 
   return goTo({ url: href, run: true });
 }
 
 function prevent(e) {
-	if (e) {
-		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-		if (e.stopPropagation) e.stopPropagation();
-		e.preventDefault();
-	}
-	return false;
+  if (e) {
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    if (e.stopPropagation) e.stopPropagation();
+    e.preventDefault();
+  }
+  return false;
 }
 
 function delegateLinkHandler(e) {
-	// ignore events the browser takes care of already:
-	if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+  // ignore events the browser takes care of already:
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
 
-	let t = e.target;
+  let t = e.target;
 
-	do {
-		if (String(t.nodeName).toUpperCase()==='A' && t.getAttribute('href')) {
-			if (e.button !== 0) return;
+  do {
+    if (String(t.nodeName).toUpperCase() === 'A' && t.getAttribute('href')) {
+      if (e.button !== 0) return;
 
-			// if link is handled by the router, prevent browser defaults
+      // if link is handled by the router, prevent browser defaults
       if (routeFromLink(t)) {
         return prevent(e);
       }
-		}
-	} while ((t=t.parentNode));
+    }
+  } while ((t = t.parentNode));
 }
 
-function setUrl(url, state = null, type='push') {
-	if (typeof history!=='undefined' && history[type+'State']) {
-		history[type+'State'](state, null, url);
-	}
+function setUrl(url, state = null, type = 'push') {
+  if (typeof history !== 'undefined' && history[`${type}State`]) {
+    history[`${type}State`](state, null, url);
+  }
 }
 
 /*
@@ -87,7 +86,7 @@ export function goTo({ query, href, path, pathname, url, search, run = true, rep
           query = qs.stringify(query);
         }
 
-        search = query ? '?' + query : '';
+        search = query ? `?${query}` : '';
       }
 
       url = pathname + search;
@@ -102,6 +101,7 @@ export function goTo({ query, href, path, pathname, url, search, run = true, rep
 
       return true;
     }
+    return false;
   });
 
   if (routers.length) {
@@ -120,7 +120,7 @@ export class Router {
 
     Object.assign(this, pick(options, 'finish', 'remember', 'pre', 'post', 'root'));
 
-    if (this.root && !this.root.startsWith('/')) this.root = '/' + this.root;
+    if (this.root && !this.root.startsWith('/')) this.root = `/${this.root}`;
 
     if (!options.routes) {
       throw new Error('No routes provided');
@@ -131,11 +131,11 @@ export class Router {
       this.routes = parseRoutes(options.routes, this.root ? this.root.split('/').slice(1) : []).sort(pathRankSort);
     }
 
-    if (typeof addEventListener==='function') {
+    if (typeof addEventListener === 'function') {
       if (options.popstate) {
         addEventListener('popstate', options.popstate);
       } else if (options.popstate !== false) {
-        addEventListener('popstate', (e) => {
+        addEventListener('popstate', () => {
           this.exec(getCurrentUrl(), true);
         });
       }
@@ -190,7 +190,7 @@ export class Router {
     return this.current;
   }
 
-  getMatchingRoute(url, invoke) {
+  getMatchingRoute(url) {
     for (let i = 0; i < this.routes.length; i++) {
       const route = this.routes[i];
 

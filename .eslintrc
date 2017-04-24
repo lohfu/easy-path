@@ -1,7 +1,6 @@
 {
   "extends": [
-    "airbnb-base",
-    "../.eslintrc"
+    "airbnb-base"
   ],
 
   "env": {
@@ -12,12 +11,34 @@
     "arrow-parens": [2, "always"],
     "consistent-return": 0,
     "func-names": 0,
+    "import/no-unresolved": [2, { "ignore": ["^[^./]"] }],
+    "import/extensions": 0,
+    "max-len": [2, { "code": 160 }],
+    "no-bitwise": 0,
     "no-cond-assign": 0,
     "no-console": [1, { "allow": ["warn", "error", "info"] }],
     "no-empty": [2, { "allowEmptyCatch": true }],
     "no-mixed-operators": 0,
+    "no-multi-assign": 0,
     "no-param-reassign": 0,
     "no-plusplus": [2, { "allowForLoopAfterthoughts": true } ],
-    "no-underscore-dangle": 0
+    "no-underscore-dangle": 0,
+    "no-shadow": 0,
+    "no-use-before-define": [2, { "functions": false }],
+    "no-useless-escape": 0
+  },
+
+  "parserOptions": {
+    "ecmaFeatures": {
+      "modules": true
+    }
+  },
+
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".json"]
+      }
+    }
   }
 }
