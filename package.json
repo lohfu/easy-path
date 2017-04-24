@@ -1,6 +1,6 @@
 {
   "name": "easy-path",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "General purpose front end URL router",
   "main": "node/index.js",
   "jsnext:main": "src/index.js",
