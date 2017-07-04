@@ -1,5 +1,3 @@
-import { omit, reduce } from 'lowline'
-
 const EMPTY = {}
 
 export function match (url, route, opts = EMPTY) {
@@ -47,27 +45,6 @@ export function match (url, route, opts = EMPTY) {
   }
   if (opts.default !== true && ret === false) return false
   return matches
-}
-
-export function parseRoutes (routes, tree = []) {
-  return reduce(routes, (result, value, key) => {
-    const path = tree.concat(key.slice(1).split('/').filter((value) => !!value))
-
-    const obj = Object.assign({
-      path: `/${path.join('/')}`,
-    }, omit(value, 'routes'))
-
-    if (obj.middleware) obj.mw = obj.middleware
-    else if (obj.mw) obj.middleware = obj.mw
-
-    result.push(obj)
-
-    if (value.routes) {
-      result.push(...parseRoutes(value.routes, path))
-    }
-
-    return result
-  }, [])
 }
 
 export function getCurrentUrl () {

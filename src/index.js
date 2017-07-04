@@ -1,6 +1,6 @@
 import { pick } from 'lowline'
 import * as qs from 'mini-qs'
-import { getCurrentUrl, match, parseRoutes, pathRankSort } from './util'
+import { getCurrentUrl, match, pathRankSort } from './util'
 
 const ROUTERS = []
 
@@ -48,7 +48,7 @@ function delegateLinkHandler (e) {
   } while ((t = t.parentNode))
 }
 
-function setUrl (url, state = null, type = 'push') {
+export function setUrl (url, state = null, type = 'push') {
   if (typeof history !== 'undefined' && history[`${type}State`]) {
     history[`${type}State`](state, null, url)
   }
@@ -93,23 +93,20 @@ export function goTo ({ query, href, path, pathname, url, search, run = true, re
     } else {
       url = path
     }
+  } else {
+    const hostname = `${window.location.protocol}//${window.location.host}`
+
+    if (url.startsWith(hostname)) {
+      url = url.slice(hostname.length)
+    }
   }
 
-  const routers = ROUTERS.filter((router) => {
-    if (router.canRoute(url)) {
-      if (!replace && router.remember) store(router.remember())
-
-      return true
-    }
-    return false
-  })
+  const routers = ROUTERS.filter((router) => router.canRoute(url))
 
   if (routers.length) {
-    setUrl(url, null, replace ? 'replace' : 'push')
-
-    if (routers.length === 1) return routers[0].exec(url, run)
-
-    return Promise.all(routers.map((router) => router.exec(url, run)))
+    return Promise.all(routers.map((router) => router.exec(url, run))).then(([ctx]) => {
+      setUrl(ctx.url, null, replace ? 'replace' : 'push')
+    })
   }
 }
 
@@ -117,18 +114,11 @@ export class Router {
   constructor (options) {
     if (options.scrollRestoration && window.history.scrollRestoration) window.history.scrollRestoration = options.scrollRestoration
 
-    Object.assign(this, pick(options, 'finish', 'remember', 'pre', 'post', 'root'))
+    Object.assign(this, pick(options, 'context', 'remember', 'realm', 'canRoute'))
 
     if (this.root && !this.root.startsWith('/')) this.root = `/${this.root}`
 
-    if (!options.routes) {
-      throw new Error('No routes provided')
-    } else if (Array.isArray(options.routes)) {
-      this.routes = options.routes
-    } else {
-      // TODO throw error if non compatible routes object
-      this.routes = parseRoutes(options.routes, this.root ? this.root.split('/').slice(1) : []).sort(pathRankSort)
-    }
+    this.layers = []
 
     if (typeof addEventListener === 'function') {
       if (options.popstate) {
@@ -148,57 +138,63 @@ export class Router {
   exec (url, run = false, reload = false) {
     if (!this._listening || (!reload && this.current && this.current.url === url)) return
 
-    const match = this.getMatchingRoute(url)
+    return (this.context ? this.context(url) : Promise.resolve({
+      url: url,
+      body: {},
+      state: {},
+    })).then((ctx) => {
+      const stack = this.layers.reduce((result, [ path, fnc ]) => {
+        const obj = {
+          fnc,
+        }
 
-    if (!match) return Promise.reject(new Error('No matching route'))
+        if (!path) {
+          result.push(obj)
+        } else {
+          const params = match(ctx.url, path)
 
-    const { params, route } = match
+          if (params) {
+            obj.params = params
+            result.push(obj)
+          }
+        }
 
-    const ctx = this.current = Object.assign({ url, state: window.history.state, params }, route)
+        return result
+      }, [])
 
-    let mw = []
+      if (!stack.length) return Promise.reject(new Error('No matching route'))
 
-    if (run) {
-      if (this.pre) mw = mw.concat(this.pre)
-      if (route.mw) mw = mw.concat(route.mw)
-      if (this.post) mw = mw.concat(this.post)
-    }
+      return new Promise((resolve, reject) => {
+        function next (err) {
+          if (err) return reject(err)
 
-    if (route.finish || this.finish) mw = mw.concat(route.finish || this.finish)
+          if (stack.length) {
+            const layer = stack.shift()
 
-    return new Promise((resolve, reject) => {
-      function next (err) {
-        if (err) return reject(err)
+            ctx.params = layer.params || {}
 
-        if (mw.length) return mw.shift()(ctx, next)
+            return layer.fnc(ctx, next)
+          }
 
-        resolve(ctx)
-      }
+          resolve(ctx)
+        }
 
-      next()
+        next()
+      })
     })
   }
 
-  /** Check if the given URL can be matched against any routes */
   canRoute (url) {
-    return this._listening && this.routes.some((route) => match(url, route.path))
+    return this._listening && (!this.realm || this.realm.test(url))
   }
 
-  /** Re-render children with a new URL to match against. */
-  getCurrentRoute () {
-    return this.current
-  }
-
-  getMatchingRoute (url) {
-    for (let i = 0; i < this.routes.length; i++) {
-      const route = this.routes[i]
-
-      const params = match(url, route.path)
-
-      if (params) {
-        return Object.assign({ params, route })
-      }
+  use (url, fnc) {
+    if (typeof url === 'function') {
+      fnc = url
+      url = null
     }
+
+    this.layers.push([ url, fnc ])
   }
 
   start (options = {}) {
@@ -217,5 +213,18 @@ export class Router {
 
   stop () {
     this._listening = false
+  }
+
+  destroy () {
+    // this.stop()
+    const index = ROUTERS.indexOf(this)
+
+    if (index > -1) {
+      ROUTERS.splice(index, 1)
+    }
+
+    if (typeof removeEventListener === 'function') {
+      removeEventListener('click', delegateLinkHandler)
+    }
   }
 }
