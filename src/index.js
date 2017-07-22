@@ -1,5 +1,6 @@
 import { pick } from 'lowline'
 import * as qs from 'mini-qs'
+// eslint-disable-next-line
 import { getCurrentUrl, match, pathRankSort } from './util'
 
 const ROUTERS = []
@@ -114,12 +115,21 @@ export class Router {
   constructor (options) {
     if (options.scrollRestoration && window.history.scrollRestoration) window.history.scrollRestoration = options.scrollRestoration
 
-    Object.assign(this, pick(options, 'context', 'remember', 'realm', 'canRoute'))
+    Object.assign(this, pick(options, 'canRoute', 'context', 'realm', 'remember', 'root'))
 
-    if (this.root && !this.root.startsWith('/')) this.root = `/${this.root}`
+    if (this.root) {
+      if (!this.root.startsWith('/')) {
+        this.root = `/${this.root}`
+      }
+
+      if (this.root.endsWith('/')) {
+        this.root = this.root.slice(0, 1)
+      }
+    }
 
     this.layers = []
 
+    // TODO where should this be? should it even be in the Router class?
     if (typeof addEventListener === 'function') {
       if (options.popstate) {
         addEventListener('popstate', options.popstate)
@@ -143,6 +153,8 @@ export class Router {
       body: {},
       state: {},
     })).then((ctx) => {
+      const url = this.root ? ctx.url.slice(this.root.length) : ctx.url
+
       const stack = this.layers.reduce((result, [ path, fnc ]) => {
         const obj = {
           fnc,
@@ -151,7 +163,7 @@ export class Router {
         if (!path) {
           result.push(obj)
         } else {
-          const params = match(ctx.url, path)
+          const params = match(url, path)
 
           if (params) {
             obj.params = params
@@ -188,13 +200,15 @@ export class Router {
     return this._listening && (!this.realm || this.realm.test(url))
   }
 
-  use (url, fnc) {
-    if (typeof url === 'function') {
-      fnc = url
-      url = null
+  use (path, ...fncs) {
+    if (typeof path === 'function') {
+      fncs.unshift(path)
+      path = null
     }
 
-    this.layers.push([ url, fnc ])
+    fncs.forEach((fnc) => {
+      this.layers.push([ path, fnc ])
+    })
   }
 
   start (options = {}) {

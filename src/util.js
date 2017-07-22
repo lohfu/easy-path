@@ -21,6 +21,7 @@ export function match (url, route, opts = EMPTY) {
 
   for (let i = 0; i < max; i++) {
     if (route[i] && route[i].charAt(0) === ':') {
+      // eslint-disable-next-line
       const param = route[i].replace(/(^\:|[+*?]+$)/g, '')
       const flags = (route[i].match(/[+*?]+$/) || EMPTY)[0] || ''
       const plus = ~flags.indexOf('+')
