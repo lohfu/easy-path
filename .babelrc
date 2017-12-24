@@ -1,7 +1,18 @@
 {
   "env": {
+    "es": {
+      "presets": [[ "@babel/env", { "modules": false } ]]
+    },
+
+    "cjs": {
+      "presets": [[ "@babel/env" ]],
+      "plugins": [
+        "add-module-exports"
+      ]
+    },
+
     "node": {
-      "presets": [ "es2015-node6", "es2016", "es2017", "stage-0" ],
+      "presets": [[ "@babel/env", { "targets": { "node": 6 } } ]],
       "plugins": [
         "add-module-exports",
         ["module-resolver", {
