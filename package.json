@@ -1,6 +1,6 @@
 {
-  "name": "easy-path",
-  "version": "0.2.0",
+  "name": "nooks",
+  "version": "0.1.0",
   "description": "General purpose front end URL router",
   "main": "node/index.js",
   "module": "es/index.js",
@@ -29,12 +29,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lohfu/easy-path.git"
+    "url": "https://github.com/lohfu/nooks.git"
   },
   "bugs": {
-    "url": "https://github.com/lohfu/easy-path/issues"
+    "url": "https://github.com/lohfu/nooks/issues"
   },
-  "homepage": "https://github.com/lohfu/easy-path",
+  "homepage": "https://github.com/lohfu/nooks",
   "dependencies": {
     "lowline": "^0.1.6",
     "mini-qs": "0.0.1"
