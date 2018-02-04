@@ -1,6 +1,6 @@
 {
   "name": "nooks",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "General purpose front end URL router",
   "main": "node/index.js",
   "module": "es/index.js",
