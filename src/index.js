@@ -105,9 +105,9 @@ export function goTo ({ query, href, path, pathname, url, search, run = true, re
   const routers = ROUTERS.filter((router) => router.canRoute(url))
 
   if (routers.length) {
-    return Promise.all(routers.map((router) => router.exec(url, run))).then(([ctx]) => {
-      setUrl(ctx.url, null, replace ? 'replace' : 'push')
-    })
+    setUrl(url, null, replace ? 'replace' : 'push')
+
+    return Promise.all(routers.map((router) => router.exec(url, run)))
   }
 }
 
