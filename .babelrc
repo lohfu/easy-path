@@ -1,13 +1,22 @@
 {
   "env": {
-    "es": {
-      "presets": [[ "@babel/env", { "modules": false } ]]
-    },
-
     "cjs": {
-      "presets": [[ "@babel/env" ]],
+      "presets": [
+        [ "@babel/env", {
+          "shippedProposals": true
+        } ]
+      ],
       "plugins": [
         "add-module-exports"
+      ]
+    },
+
+    "esm": {
+      "presets": [
+        [ "@babel/env", {
+          "modules": false,
+          "shippedProposals": true
+        } ]
       ]
     },
 
