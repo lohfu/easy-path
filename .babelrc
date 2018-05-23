@@ -18,19 +18,6 @@
           "shippedProposals": true
         } ]
       ]
-    },
-
-    "node": {
-      "presets": [[ "@babel/env", { "targets": { "node": 6 } } ]],
-      "plugins": [
-        "add-module-exports",
-        ["module-resolver", {
-          "alias": {
-            "lowline": "lodash",
-            "mini-qs": "querystring"
-          }
-        }]
-      ]
     }
   }
 }

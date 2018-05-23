@@ -6,10 +6,9 @@
   "scripts": {
     "clean": "rimraf lib node",
     "lint": "eslint src",
-    "build": "npm run build:cjs && npm run build:esm && npm run build:node",
+    "build": "npm run build:cjs && npm run build:esm",
     "build:cjs": "BABEL_ENV=cjs babel src --out-dir lib",
     "build:esm": "BABEL_ENV=esm babel src --keep-file-extension --out-dir lib",
-    "build:node": "BABEL_ENV=node babel src --out-dir node",
     "test": "BABEL_ENV=node node tests/index.js | tap-spec",
     "prepublish": "npm run lint && npm run clean && npm run build"
   },
@@ -32,9 +31,6 @@
   "dependencies": {
     "lowline": "^0.2.2",
     "mini-qs": "0.1.1"
-  },
-  "optionalDependencies": {
-    "lodash": "^4.17.10"
   },
   "devDependencies": {
     "@babel/cli": "^7.0.0-beta.47",
