@@ -36,25 +36,25 @@
   },
   "homepage": "https://github.com/lohfu/nooks",
   "dependencies": {
-    "lowline": "^0.1.6",
-    "mini-qs": "0.1.0"
+    "lowline": "^0.2.2",
+    "mini-qs": "0.1.1"
   },
   "optionalDependencies": {
-    "lodash": "^4.17.5"
+    "lodash": "^4.17.10"
   },
   "devDependencies": {
-    "@babel/cli": "^7.0.0-beta.39",
-    "@babel/core": "^7.0.0-beta.39",
-    "@babel/preset-env": "^7.0.0-beta.39",
+    "@babel/cli": "^7.0.0-beta.47",
+    "@babel/core": "^7.0.0-beta.47",
+    "@babel/preset-env": "^7.0.0-beta.47",
     "babel-plugin-add-module-exports": "^0.2.1",
-    "babel-plugin-module-resolver": "^3.0.0",
-    "eslint": "^4.17.0",
-    "eslint-config-standard": "^11.0.0-beta.0",
-    "eslint-plugin-import": "^2.8.0",
-    "eslint-plugin-node": "^5.2.1",
-    "eslint-plugin-promise": "^3.6.0",
-    "eslint-plugin-standard": "^3.0.1",
+    "babel-plugin-module-resolver": "^3.1.1",
+    "eslint": "^4.19.1",
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-import": "^2.12.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.7.0",
+    "eslint-plugin-standard": "^3.1.0",
     "tap-spec": "^4.1.1",
-    "tape": "^4.8.0"
+    "tape": "^4.9.0"
   }
 }
