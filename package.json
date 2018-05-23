@@ -1,6 +1,6 @@
 {
   "name": "nooks",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "General purpose front end URL router",
   "main": "./lib/index",
   "scripts": {
